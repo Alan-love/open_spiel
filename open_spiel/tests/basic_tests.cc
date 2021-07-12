@@ -107,18 +107,6 @@ void LegalActionsIsEmptyForOtherPlayers(const Game& game, State& state) {
   }
 }
 
-// Check that the legal actions list is sorted.
-
-void LegalActionsAreSorted(const Game& game, State& state) {
-  if (state.IsChanceNode()) return;
-  for (int player = 0; player < game.NumPlayers(); ++player) {
-    auto actions = state.LegalActions(player);
-    for (int i = 1; i < actions.size(); ++i) {
-      SPIEL_CHECK_LT(actions[i - 1], actions[i]);
-    }
-  }
-}
-
 void LegalActionsMaskTest(const Game& game, const State& state, int player,
                           const std::vector<Action>& legal_actions) {
   std::vector<int> legal_actions_mask = state.LegalActionsMask(player);
@@ -267,11 +255,26 @@ void CheckObservables(const Game& game,
   }
 }
 
+// This is used for mean-field games.
+std::vector<double> RandomDistribution(int num_states, std::mt19937* rng) {
+  std::uniform_real_distribution<double> rand(0, 1);
+  std::vector<double> distrib;
+  distrib.reserve(num_states);
+  for (int i = 0; i < num_states; ++i) {
+    distrib.push_back(rand(*rng));
+  }
+  double sum = std::accumulate(distrib.begin(), distrib.end(), 0.);
+  for (int i = 0; i < num_states; ++i) {
+    distrib[i] /= sum;
+  }
+  return distrib;
+}
+
 void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
-                      bool serialize, bool verbose,
+                      bool serialize, bool verbose, bool mask_test,
                       std::shared_ptr<Observer> observer,  // Can be nullptr
-                      std::function<void(const State&)> state_checker_fn
-                     ) {
+                      std::function<void(const State&)> state_checker_fn,
+                      int mean_field_population = -1) {
   std::unique_ptr<Observation> observation =
       observer == nullptr ? nullptr
                           : std::make_unique<Observation>(game, observer);
@@ -301,13 +304,19 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
 
     std::cout << "Starting new game.." << std::endl;
   }
-  std::unique_ptr<open_spiel::State> state = game.NewInitialState();
+  std::unique_ptr<open_spiel::State> state;
+  if (mean_field_population == -1) {
+    state = game.NewInitialState();
+  } else {
+    state = game.NewInitialStateForPopulation(mean_field_population);
+  }
 
   if (verbose) {
     std::cout << "Initial state:" << std::endl;
     std::cout << "State:" << std::endl << state->ToString() << std::endl;
   }
   int game_length = 0;
+  int num_moves = 0;
 
   while (!state->IsTerminal()) {
     state_checker_fn(*state);
@@ -317,27 +326,33 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
     }
 
     LegalActionsIsEmptyForOtherPlayers(game, *state);
-    LegalActionsAreSorted(game, *state);
+    CheckLegalActionsAreSorted(game, *state);
 
     // Test cloning the state.
     std::unique_ptr<open_spiel::State> state_copy = state->Clone();
     SPIEL_CHECK_EQ(state->ToString(), state_copy->ToString());
     SPIEL_CHECK_EQ(state->History(), state_copy->History());
 
+    if (game.GetType().dynamics == GameType::Dynamics::kMeanField) {
+      SPIEL_CHECK_LT(state->MoveNumber(), game.MaxMoveNumber());
+      SPIEL_CHECK_EQ(state->MoveNumber(), num_moves);
+    }
+
     if (serialize && (history.size() < 10 || IsPowerOfTwo(history.size()))) {
       TestSerializeDeserialize(game, state.get());
     }
 
     if (state->IsChanceNode()) {
-      LegalActionsMaskTest(game, *state, kChancePlayerId,
-                           state->LegalActions());
+      if (mask_test) LegalActionsMaskTest(game, *state, kChancePlayerId,
+                                          state->LegalActions());
       // Chance node; sample one according to underlying distribution
       std::vector<std::pair<Action, double>> outcomes = state->ChanceOutcomes();
-      Action action = open_spiel::SampleAction(outcomes, *rng).first;
+      auto [action, prob] = open_spiel::SampleAction(outcomes, *rng);
 
       if (verbose) {
         std::cout << "sampled outcome: "
                   << state->ActionToString(kChancePlayerId, action)
+                  << " with prob " << prob
                   << std::endl;
       }
       history.emplace_back(state->Clone(), kChancePlayerId, action);
@@ -346,6 +361,7 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
       if (undo && (history.size() < 10 || IsPowerOfTwo(history.size()))) {
         TestUndo(state->Clone(), history);
       }
+      num_moves++;
     } else if (state->CurrentPlayer() == open_spiel::kSimultaneousPlayerId) {
       std::vector<double> rewards = state->Rewards();
       SPIEL_CHECK_EQ(rewards.size(), game.NumPlayers());
@@ -362,9 +378,12 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
       // Sample an action for each player
       for (auto p = Player{0}; p < game.NumPlayers(); p++) {
         std::vector<Action> actions = state->LegalActions(p);
-        LegalActionsMaskTest(game, *state, p, actions);
-        std::uniform_int_distribution<int> dis(0, actions.size() - 1);
-        Action action = actions[dis(*rng)];
+        Action action = 0;
+        if (!actions.empty()) {
+          if (mask_test) LegalActionsMaskTest(game, *state, p, actions);
+          std::uniform_int_distribution<int> dis(0, actions.size() - 1);
+          action = actions[dis(*rng)];
+        }
         joint_action.push_back(action);
         if (p == 0) {
           history.emplace_back(state->Clone(), kInvalidHistoryPlayer, action);
@@ -380,6 +399,9 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
 
       ApplyActionTestClone(game, state.get(), joint_action);
       game_length++;
+    } else if (state->CurrentPlayer() == open_spiel::kMeanFieldPlayerId) {
+      auto support = state->DistributionSupport();
+      state->UpdateDistribution(RandomDistribution(support.size(), rng));
     } else {
       std::vector<double> rewards = state->Rewards();
       SPIEL_CHECK_EQ(rewards.size(), game.NumPlayers());
@@ -397,7 +419,8 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
 
       // Sample an action uniformly.
       std::vector<Action> actions = state->LegalActions();
-      LegalActionsMaskTest(game, *state, state->CurrentPlayer(), actions);
+      if (mask_test) LegalActionsMaskTest(game, *state, state->CurrentPlayer(),
+                                          actions);
       if (state->IsTerminal())
         SPIEL_CHECK_TRUE(actions.empty());
       else
@@ -412,6 +435,7 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
       history.emplace_back(state->Clone(), player, action);
       ApplyActionTestClone(game, state.get(), action);
       game_length++;
+      num_moves++;
 
       if (undo && (history.size() < 10 || IsPowerOfTwo(history.size()))) {
         TestUndo(state->Clone(), history);
@@ -464,9 +488,10 @@ void RandomSimulation(std::mt19937* rng, const Game& game, bool undo,
 }
 
 // Perform sims random simulations of the specified game.
-void RandomSimTest(const Game& game, int num_sims, bool serialize,
-                   bool verbose,
-                   const std::function<void(const State&)>& state_checker_fn) {
+void RandomSimTest(const Game& game, int num_sims, bool serialize, bool verbose,
+                   bool mask_test,
+                   const std::function<void(const State&)>& state_checker_fn,
+                   int mean_field_population) {
   std::mt19937 rng;
   if (verbose) {
     std::cout << "\nRandomSimTest, game = " << game.GetType().short_name
@@ -474,7 +499,8 @@ void RandomSimTest(const Game& game, int num_sims, bool serialize,
   }
   for (int sim = 0; sim < num_sims; ++sim) {
     RandomSimulation(&rng, game, /*undo=*/false, /*serialize=*/serialize,
-                     verbose, nullptr, state_checker_fn);
+                     verbose, mask_test, nullptr, state_checker_fn,
+                     mean_field_population);
   }
 }
 
@@ -484,7 +510,8 @@ void RandomSimTestWithUndo(const Game& game, int num_sims) {
             << ", num_sims = " << num_sims << std::endl;
   for (int sim = 0; sim < num_sims; ++sim) {
     RandomSimulation(&rng, game, /*undo=*/true, /*serialize=*/true,
-                     /*verbose=*/true, nullptr, &DefaultStateChecker);
+                     /*verbose=*/true, /*mask_test=*/true, nullptr,
+                     &DefaultStateChecker);
   }
 }
 
@@ -494,7 +521,8 @@ void RandomSimTestNoSerialize(const Game& game, int num_sims) {
             << ", num_sims = " << num_sims << std::endl;
   for (int sim = 0; sim < num_sims; ++sim) {
     RandomSimulation(&rng, game, /*undo=*/false, /*serialize=*/false,
-                     /*verbose=*/true, nullptr, &DefaultStateChecker);
+                     /*verbose=*/true, /*mask_test=*/true, nullptr,
+                     &DefaultStateChecker);
   }
 }
 
@@ -502,7 +530,8 @@ void RandomSimTestCustomObserver(const Game& game,
                                  const std::shared_ptr<Observer> observer) {
   std::mt19937 rng;
   RandomSimulation(&rng, game, /*undo=*/false, /*serialize=*/false,
-                   /*verbose=*/false, observer, &DefaultStateChecker);
+                   /*verbose=*/false, /*mask_test=*/true, observer,
+                   &DefaultStateChecker);
 }
 
 // Format chance outcomes as a string, for error messages.
@@ -662,6 +691,16 @@ void TestEveryInfostateInPolicy(TabularPolicyGenerator policy_generator,
       SPIEL_CHECK_EQ(
           policy.GetStatePolicy(state->InformationStateString()).size(),
           state->LegalActions().size());
+    }
+  }
+}
+
+void CheckLegalActionsAreSorted(const Game& game, State& state) {
+  if (state.IsChanceNode()) return;
+  for (int player = 0; player < game.NumPlayers(); ++player) {
+    auto actions = state.LegalActions(player);
+    for (int i = 1; i < actions.size(); ++i) {
+      SPIEL_CHECK_LT(actions[i - 1], actions[i]);
     }
   }
 }
