@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,8 +32,6 @@
 //
 // These assumptions hold for tiny_hanabi and tiny_bridge_2p, but are unlikely
 // to hold in other games.
-//
-// TODO(author11) Define public / private info interfaces (FOG?) and use them.
 
 namespace open_spiel {
 namespace coop_to_1p {
@@ -173,7 +171,9 @@ class CoopTo1pGame : public Game {
   int MaxChanceOutcomes() const override { return game_->MaxChanceOutcomes(); }
   double MinUtility() const override { return game_->MinUtility(); }
   double MaxUtility() const override { return game_->MaxUtility(); }
-  double UtilitySum() const override { return game_->UtilitySum(); }
+  absl::optional<double> UtilitySum() const override {
+    return game_->UtilitySum();
+  }
 
  private:
   std::shared_ptr<const Game> game_;

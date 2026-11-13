@@ -19,13 +19,12 @@ extensions.
 
 **Multi-language support**
 
-*   C++17
+*   C++20
 *   Python 3
 
 The games and utility functions (e.g. exploitability computation) are written in
 C++. These are also available using
-[pybind11](https://pybind11.readthedocs.io/en/stable/) Python (2.7 and 3)
-bindings.
+[pybind11](https://pybind11.readthedocs.io/en/stable/) Python bindings.
 
 The methods names are in `CamelCase` in C++ and `snake_case` in Python (e.g.
 `state.ApplyAction` in C++ will be `state.apply_action` in Python). See the
@@ -37,8 +36,8 @@ available from Python.
 
 **Platforms**
 
-OpenSpiel has been tested on Linux (Debian 10 and Ubuntu 19.04), MacOS, and
-[Windows 10 (through Windows Subsystem for Linux)](windows.md).
+OpenSpiel has been tested on Linux (Ubuntu and Debian), MacOS. There is limited
+support for on [Windows 10](windows.md).
 
 **Visualization of games**
 
@@ -47,3 +46,7 @@ There is a basic visualizer based on graphviz, see
 
 There is an interactive viewer for OpenSpiel games called
 [SpielViz](https://github.com/michalsustr/spielviz).
+
+There is also [spielviz](https://github.com/kvr06-ai/spielviz), a standalone
+Python library (`pip install spielviz`) that renders game trees, information
+sets, and strategy profiles using matplotlib.

@@ -1,10 +1,10 @@
-# Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+# Copyright 2019 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
-"""Tests for open_spiel.integration_tests.api."""
-
-import collections
 import enum
 import re
-from typing import Callable, Dict, List, Tuple
 import unittest
 
 from absl import app
@@ -27,8 +22,10 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 
+from open_spiel.python import games  # pylint:disable=unused-import
 from open_spiel.python.algorithms import get_all_states
 from open_spiel.python.algorithms import sample_some_states
+from open_spiel.python.mfg import games as mfg_games  # pylint:disable=unused-import
 from open_spiel.python.observation import make_observation
 import pyspiel
 
@@ -38,10 +35,17 @@ flags.DEFINE_string("test_only_games", ".*",
 
 _ALL_GAMES = pyspiel.registered_games()
 
-_GAMES_TO_TEST = set([g.short_name for g in _ALL_GAMES if g.default_loadable])
+_GAMES_TO_TEST = set(
+    [
+        g.short_name
+        for g in _ALL_GAMES
+        if g.default_loadable and not g.action_structs_only
+    ]
+)
 
 _GAMES_NOT_UNDER_TEST = [
-    g.short_name for g in _ALL_GAMES if not g.default_loadable
+    g.short_name for g in _ALL_GAMES if (not g.default_loadable or
+                                         g.action_structs_only)
 ]
 
 _GAMES_TO_OMIT_LEGAL_ACTIONS_CHECK = set(["bridge_uncontested_bidding"])
@@ -52,14 +56,14 @@ _GAMES_FULL_TREE_TRAVERSAL_TESTS = [
     ("cliff_walking", "cliff_walking(horizon=7)"),
     ("kuhn_poker", "kuhn_poker"),
     ("leduc_poker", "leduc_poker"),
-    ("iigoofspiel4", "turn_based_simultaneous_game(game=goofspiel("
-     "imp_info=True,num_cards=4,points_order=descending))"),
+    ("iigoofspiel4", ("turn_based_simultaneous_game(game=goofspiel("
+                      "imp_info=True,num_cards=4,points_order=descending))")),
     ("kuhn_poker3p", "kuhn_poker(players=3)"),
     ("first_sealed_auction", "first_sealed_auction(max_value=2)"),
     ("tiny_hanabi", "tiny_hanabi"),
-    ("nf_auction", "turn_based_simultaneous_game(game="
-     "normal_form_extensive_game(game="
-     "first_sealed_auction(max_value=3)))"),
+    ("nf_auction", ("turn_based_simultaneous_game(game="
+                    "normal_form_extensive_game(game="
+                    "first_sealed_auction(max_value=3)))")),
     # Disabled by default - big games, slow tests.
     # Uncomment to check the games if you modify them.
     # ("liars_dice", "liars_dice"),
@@ -383,22 +387,24 @@ class EnforceAPIOnPartialTreeBase(parameterized.TestCase):
             self.assertEmpty(state.legal_actions(player), msg=msg)
 
   def test_private_information_contents(self):
-    try:
-      private_observation = make_observation(
-          self.game,
-          pyspiel.IIGObservationType(
-              public_info=False,
-              perfect_recall=False,
-              private_info=pyspiel.PrivateInfoType.SINGLE_PLAYER))
-    except (RuntimeError, ValueError):
+    private_observation = make_observation(
+        self.game,
+        pyspiel.IIGObservationType(
+            public_info=False,
+            perfect_recall=False,
+            private_info=pyspiel.PrivateInfoType.SINGLE_PLAYER,
+        ),
+    )
+
+    if (not private_observation
+        or private_observation.string_from(self.some_states[0], 0) is None):
       return
 
     player_has_private_info = [False] * self.game.num_players()
 
     for state in self.some_states:
       for i in range(self.game.num_players()):
-        if (private_observation.string_from(state, i) !=
-            pyspiel.PrivateObservation.NOTHING):
+        if private_observation.string_from(state, i):
           player_has_private_info[i] = True
 
     if (self.game_type.information ==
@@ -409,129 +415,22 @@ class EnforceAPIOnPartialTreeBase(parameterized.TestCase):
       self.assertFalse(any(player_has_private_info))
 
   def test_no_invalid_public_observations(self):
-    try:
-      public_observation = make_observation(
-          self.game,
-          pyspiel.IIGObservationType(
-              public_info=True,
-              perfect_recall=False,
-              private_info=pyspiel.PrivateInfoType.NONE))
-    except (ValueError, RuntimeError):
+    public_observation = make_observation(
+        self.game,
+        pyspiel.IIGObservationType(
+            public_info=True,
+            perfect_recall=False,
+            private_info=pyspiel.PrivateInfoType.NONE,
+        ),
+    )
+    if not public_observation:
+      return
+
+    if public_observation.string_from(self.some_states[0], 0) is None:
       return
 
     for state in self.some_states:
-      self.assertNotEqual(
-          public_observation.string_from(state, 0),
-          pyspiel.PublicObservation.INVALID)
-
-  def _check_partition_consistency(
-      self, partition_callbacks: Dict[str, Callable[[int, pyspiel.State], str]],
-      partition_relations: List[Tuple[str, Relation, str]]):
-
-    for player in range(self.game.num_players()):
-      states_representations = collections.defaultdict(dict)
-      partitioned_sets = {
-          name: collections.defaultdict(set)
-          for name in partition_callbacks.keys()
-      }
-      for state in self.some_states:
-        history = state.history_str()
-        for name, callback in partition_callbacks.items():
-          representation = callback(player, state)
-          states_representations[history][name] = representation
-          partitioned_sets[name][representation].add(history)
-
-      for x, relation, y in partition_relations:
-        for state in self.some_states:
-          history = state.history_str()
-          rep_x = states_representations[history][x]
-          rep_y = states_representations[history][y]
-          histories_x = partitioned_sets[x][rep_x]
-          histories_y = partitioned_sets[y][rep_y]
-          if relation == Relation.EQUALS:
-            if histories_x != histories_y:
-              self.assertEqual(
-                  histories_x, histories_y,
-                  self._show_error(player, state, x, relation, y, rep_x, rep_y,
-                                   histories_x, histories_y))
-          elif relation == Relation.SUBSET_OR_EQUALS:
-            if not histories_x.issubset(histories_y):
-              self.assertTrue(
-                  histories_x.issubset(histories_y),
-                  self._show_error(player, state, x, relation, y, rep_x, rep_y,
-                                   histories_x, histories_y))
-          else:
-            raise RuntimeError(f"Unknown relation {relation}")
-
-  def _show_error(self, pl, state, x, relation, y, rep_x, rep_y, histories_x,
-                  histories_y):
-    s = "Observation consistency failed.\n"
-    s += f"It should hold that partition of '{x}' is {relation} of '{y}'\n"
-    s += "Problem occurred while evaluating action history "
-    s += f"'{state.history_str()}' for player {pl}.\n"
-    s += f"The state representation is:\n{state}\n"
-    s += "-" * 80
-    s += "\nDetailed information:\n"
-    s += f"The set of histories that have the same '{x}':\n{histories_x}\n"
-    s += f"The set of histories that have the same '{y}':\n{histories_y}\n"
-    s += f"The set difference is:\n{histories_y - histories_x}\n"
-    s += f"The problematic {x} is '{rep_x}'\n"
-    s += f"The problematic {y} is '{rep_y}'\n"
-    return s
-
-  def test_observation_consistency(self):
-    if self.game_type.dynamics != pyspiel.GameType.Dynamics.SEQUENTIAL:
-      return  # TODO(author13): support also other types of games.
-
-    # TODO(author13): Following games need to be fixed -- they currently
-    # do not pass the observation consistency test.
-    broken_games = [
-        "first_sealed_auction", "hearts", "kuhn_poker", "leduc_poker",
-        "lewis_signaling", "liars_dice", "pentago", "phantom_ttt",
-        "tiny_bridge_2p", "tiny_bridge_4p", "tiny_hanabi", "universal_poker",
-        "dark_hex", "phantom_ttt_ir", "dark_hex_ir"
-    ]
-    if self.game_name in broken_games:
-      return
-
-    callbacks = dict()
-    callbacks["move_number"] = lambda _, state: str(state.move_number())
-    # pylint: disable=g-long-lambda
-    if self.game_type.provides_information_state_string:
-      callbacks["information_state_string"] = (
-          lambda player, state: state.information_state_string(player))
-    if self.game_type.provides_observation_string:
-      callbacks["action_observation_history"] = (lambda player, state: str(
-          pyspiel.ActionObservationHistory(player, state)))
-    if self.game_type.provides_factored_observation_string:
-      callbacks["public_observation_history"] = (
-          lambda player, state: str(pyspiel.PublicObservationHistory(state)))
-
-    # TODO(author13): Add testing of tensor variants.
-
-    relations = []
-
-    def add_relation(x, relation, y):
-      if x in callbacks and y in callbacks:
-        relations.append((x, relation, y))
-
-    # All observations should be subsets of move_number.
-    add_relation("information_state_string", Relation.SUBSET_OR_EQUALS,
-                 "move_number")
-    add_relation("public_observation_history", Relation.SUBSET_OR_EQUALS,
-                 "move_number")
-    add_relation("action_observation_history", Relation.SUBSET_OR_EQUALS,
-                 "move_number")
-
-    # Other relations:
-    add_relation("information_state_string", Relation.EQUALS,
-                 "action_observation_history")
-    add_relation("information_state_string", Relation.SUBSET_OR_EQUALS,
-                 "public_observation_history")
-    add_relation("action_observation_history", Relation.SUBSET_OR_EQUALS,
-                 "public_observation_history")
-
-    self._check_partition_consistency(callbacks, relations)
+      self.assertIsNotNone(public_observation.string_from(state, 0))
 
 
 def _assert_properties_recursive(state, assert_functions):
@@ -686,10 +585,7 @@ def _assert_is_perfect_recall_recursive(state, current_history,
                           for s, a in current_history
                           if s.current_player() == current_player]
 
-      if not all([
-          np.array_equal(x, y)
-          for x, y in zip(expected_infosets_history, infosets_history)
-      ]):
+      if infosets_history != expected_infosets_history:
         raise ValueError("The history as tensor in the same infoset "
                          "are different:\n"
                          "History: {!r}\n".format(state.history()))

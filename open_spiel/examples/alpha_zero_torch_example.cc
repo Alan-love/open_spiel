@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,17 @@
 // limitations under the License.
 
 #include <signal.h>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
-#include "open_spiel/abseil-cpp/absl/flags/flag.h"
-#include "open_spiel/abseil-cpp/absl/flags/parse.h"
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
 #include "open_spiel/algorithms/alpha_zero_torch/alpha_zero.h"
+#include "open_spiel/spiel_utils.h"
+#include "open_spiel/utils/file.h"
+#include "open_spiel/utils/init.h"
+#include "open_spiel/utils/json.h"
 #include "open_spiel/utils/thread.h"
 
 ABSL_FLAG(std::string, game, "tic_tac_toe", "The name of the game to play.");
@@ -25,7 +32,7 @@ ABSL_FLAG(std::string, graph_def, "",
           ("Where to get the graph. This could be from export_model.py, or "
            "from a checkpoint. If this is empty it'll create one."));
 ABSL_FLAG(std::string, nn_model, "resnet",
-          "Model torso type, currently only resnet is available.");
+          "Model torso type, can be resnet or mlp.");
 ABSL_FLAG(int, nn_width, 128, "Width of the model, passed to export_model.py.");
 ABSL_FLAG(int, nn_depth, 10, "Depth of the model, passed to export_model.py.");
 ABSL_FLAG(double, uct_c, 2, "UCT exploration constant.");
@@ -95,41 +102,65 @@ void signal_installer() {
 }
 
 int main(int argc, char** argv) {
-  absl::ParseCommandLine(argc, argv);
+  open_spiel::Init("", &argc, &argv, true);
+
+  std::vector<char*> positional_args = absl::ParseCommandLine(argc, argv);
   signal_installer();
 
+  bool resuming;
   open_spiel::algorithms::torch_az::AlphaZeroConfig config;
-  config.game = absl::GetFlag(FLAGS_game);
-  config.path = absl::GetFlag(FLAGS_path);
-  config.graph_def = absl::GetFlag(FLAGS_graph_def);
-  config.nn_model = absl::GetFlag(FLAGS_nn_model);
-  config.nn_width = absl::GetFlag(FLAGS_nn_width);
-  config.nn_depth = absl::GetFlag(FLAGS_nn_depth);
-  config.devices = absl::GetFlag(FLAGS_devices);
-  config.explicit_learning = absl::GetFlag(FLAGS_explicit_learning);
-  config.learning_rate = absl::GetFlag(FLAGS_learning_rate);
-  config.weight_decay = absl::GetFlag(FLAGS_weight_decay);
-  config.train_batch_size = absl::GetFlag(FLAGS_train_batch_size);
-  config.replay_buffer_size = absl::GetFlag(FLAGS_replay_buffer_size);
-  config.replay_buffer_reuse = absl::GetFlag(FLAGS_replay_buffer_reuse);
-  config.checkpoint_freq = absl::GetFlag(FLAGS_checkpoint_freq);
-  config.evaluation_window = absl::GetFlag(FLAGS_evaluation_window);
-  config.uct_c = absl::GetFlag(FLAGS_uct_c);
-  config.max_simulations = absl::GetFlag(FLAGS_max_simulations);
-  config.train_batch_size = absl::GetFlag(FLAGS_train_batch_size);
-  config.inference_batch_size = absl::GetFlag(FLAGS_inference_batch_size);
-  config.inference_threads = absl::GetFlag(FLAGS_inference_threads);
-  config.inference_cache = absl::GetFlag(FLAGS_inference_cache);
-  config.policy_alpha = absl::GetFlag(FLAGS_policy_alpha);
-  config.policy_epsilon = absl::GetFlag(FLAGS_policy_epsilon);
-  config.temperature = absl::GetFlag(FLAGS_temperature);
-  config.temperature_drop = absl::GetFlag(FLAGS_temperature_drop);
-  config.cutoff_probability = absl::GetFlag(FLAGS_cutoff_probability);
-  config.cutoff_value = absl::GetFlag(FLAGS_cutoff_value);
-  config.actors = absl::GetFlag(FLAGS_actors);
-  config.evaluators = absl::GetFlag(FLAGS_evaluators);
-  config.eval_levels = absl::GetFlag(FLAGS_eval_levels);
-  config.max_steps = absl::GetFlag(FLAGS_max_steps);
 
-  return !AlphaZero(config, &stop_token);
+  if (positional_args.size() > 1) {
+    // Resume training from a checkpoint.
+    resuming = true;
+
+    if (positional_args.size() > 2) {
+      open_spiel::SpielFatalError(
+          "Specify only a path to a config.json to resume training.");
+    }
+
+    open_spiel::file::File config_file(positional_args[1], "r");
+    std::string config_string = config_file.ReadContents();
+    open_spiel::json::Object config_json = open_spiel::json::FromString(
+        config_string).value().GetObject();
+
+    config.FromJson(config_json);
+  } else {
+    // Start training from scratch.
+    resuming = false;
+
+    config.game = absl::GetFlag(FLAGS_game);
+    config.path = absl::GetFlag(FLAGS_path);
+    config.graph_def = absl::GetFlag(FLAGS_graph_def);
+    config.nn_model = absl::GetFlag(FLAGS_nn_model);
+    config.nn_width = absl::GetFlag(FLAGS_nn_width);
+    config.nn_depth = absl::GetFlag(FLAGS_nn_depth);
+    config.devices = absl::GetFlag(FLAGS_devices);
+    config.explicit_learning = absl::GetFlag(FLAGS_explicit_learning);
+    config.learning_rate = absl::GetFlag(FLAGS_learning_rate);
+    config.weight_decay = absl::GetFlag(FLAGS_weight_decay);
+    config.train_batch_size = absl::GetFlag(FLAGS_train_batch_size);
+    config.replay_buffer_size = absl::GetFlag(FLAGS_replay_buffer_size);
+    config.replay_buffer_reuse = absl::GetFlag(FLAGS_replay_buffer_reuse);
+    config.checkpoint_freq = absl::GetFlag(FLAGS_checkpoint_freq);
+    config.evaluation_window = absl::GetFlag(FLAGS_evaluation_window);
+    config.uct_c = absl::GetFlag(FLAGS_uct_c);
+    config.max_simulations = absl::GetFlag(FLAGS_max_simulations);
+    config.train_batch_size = absl::GetFlag(FLAGS_train_batch_size);
+    config.inference_batch_size = absl::GetFlag(FLAGS_inference_batch_size);
+    config.inference_threads = absl::GetFlag(FLAGS_inference_threads);
+    config.inference_cache = absl::GetFlag(FLAGS_inference_cache);
+    config.policy_alpha = absl::GetFlag(FLAGS_policy_alpha);
+    config.policy_epsilon = absl::GetFlag(FLAGS_policy_epsilon);
+    config.temperature = absl::GetFlag(FLAGS_temperature);
+    config.temperature_drop = absl::GetFlag(FLAGS_temperature_drop);
+    config.cutoff_probability = absl::GetFlag(FLAGS_cutoff_probability);
+    config.cutoff_value = absl::GetFlag(FLAGS_cutoff_value);
+    config.actors = absl::GetFlag(FLAGS_actors);
+    config.evaluators = absl::GetFlag(FLAGS_evaluators);
+    config.eval_levels = absl::GetFlag(FLAGS_eval_levels);
+    config.max_steps = absl::GetFlag(FLAGS_max_steps);
+  }
+
+  return !AlphaZero(config, &stop_token, resuming);
 }

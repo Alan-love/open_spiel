@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,7 @@
 
 #include "open_spiel/spiel_bots.h"
 
+#include <limits>
 #include <memory>
 #include <random>
 #include <string>
@@ -21,8 +22,15 @@
 #include <utility>
 #include <vector>
 
-#include "open_spiel/abseil-cpp/absl/random/uniform_int_distribution.h"
-#include "open_spiel/abseil-cpp/absl/strings/string_view.h"
+#include "absl/random/distributions.h"
+#include "absl/random/random.h"
+#include "absl/random/uniform_int_distribution.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
+#include "open_spiel/game_parameters.h"
 #include "open_spiel/policy.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
@@ -60,6 +68,12 @@ class UniformRandomBot : public Bot {
     return std::make_pair(policy, policy[selection].first);
   }
 
+  bool IsClonable() const override { return true; }
+  std::unique_ptr<Bot> Clone() override {
+    return std::make_unique<UniformRandomBot>(*this);
+  }
+  UniformRandomBot(const UniformRandomBot& other) = default;
+
  private:
   const Player player_id_;
   std::mt19937 rng_;
@@ -90,6 +104,12 @@ class StatefulRandomBot : public UniformRandomBot {
     state_->ApplyAction(ret.second);
     return ret;
   }
+
+  std::unique_ptr<Bot> Clone() override {
+    return std::make_unique<StatefulRandomBot>(*this);
+  }
+  StatefulRandomBot(const StatefulRandomBot& other)
+      : UniformRandomBot(other), state_(other.state_->Clone()) {}
 
  private:
   void CheckStatesEqual(const State& state1, const State& state2) const {
@@ -123,6 +143,12 @@ class PolicyBot : public Bot {
     ActionsAndProbs actions_and_probs = GetPolicy(state);
     return {actions_and_probs, SampleAction(actions_and_probs, rng_).first};
   }
+
+  bool IsClonable() const override { return true; }
+  std::unique_ptr<Bot> Clone() override {
+    return std::make_unique<PolicyBot>(*this);
+  }
+  PolicyBot(const PolicyBot& other) = default;
 
  private:
   std::mt19937 rng_;
@@ -158,6 +184,12 @@ class FixedActionPreferenceBot : public Bot {
     return {actions_and_probs, actions_and_probs[0].first};
   }
 
+  bool IsClonable() const override { return true; }
+  std::unique_ptr<Bot> Clone() override {
+    return std::make_unique<FixedActionPreferenceBot>(*this);
+  }
+  FixedActionPreferenceBot(const FixedActionPreferenceBot& other) = default;
+
  private:
   const Player player_id_;
   std::vector<Action> actions_;
@@ -184,6 +216,10 @@ class UniformRandomBotFactory : public BotFactory {
     if (IsParameterSpecified(bot_params, "seed")) {
       const GameParameter& seed_param = bot_params.at("seed");
       seed = seed_param.int_value();
+    } else {
+      absl::BitGen gen;
+      seed = absl::Uniform<int>(gen, std::numeric_limits<int>::min(),
+                                std::numeric_limits<int>::max());
     }
     return MakeUniformRandomBot(player_id, seed);
   }
@@ -192,9 +228,12 @@ REGISTER_SPIEL_BOT("uniform_random", UniformRandomBotFactory);
 }  // namespace
 
 // A bot that samples from a policy.
+std::unique_ptr<Bot> MakePolicyBot(int seed, std::shared_ptr<Policy> policy) {
+  return std::make_unique<PolicyBot>(seed, std::move(policy));
+}
 std::unique_ptr<Bot> MakePolicyBot(const Game& game, Player player_id, int seed,
                                    std::shared_ptr<Policy> policy) {
-  return std::make_unique<PolicyBot>(seed, std::move(policy));
+  return MakePolicyBot(seed, std::move(policy));
 }
 // A bot with a fixed action preference, for test purposes.
 // Picks the first legal action found in the list of actions.
@@ -312,7 +351,13 @@ bool IsBotRegistered(const std::string& bot_name) {
 std::unique_ptr<Bot> LoadBot(const std::string& bot_name,
                              const std::shared_ptr<const Game>& game,
                              Player player_id) {
-  return LoadBot(bot_name, game, player_id, GameParametersFromString(bot_name));
+  GameParameters params = GameParametersFromString(bot_name);
+
+  // We use the "name" parameter, as that is the "short_name", which is what we
+  // want. Otherwise, this will use the "long name", which includes the config.
+  // e.g. if the bot_name is "my_bot(parameter=value)", then we want the
+  // bot_name here to be "my_bot", not "my_bot(parameter=value)".
+  return LoadBot(params["name"].string_value(), game, player_id, params);
 }
 
 std::unique_ptr<Bot> LoadBot(const std::string& bot_name,

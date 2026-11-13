@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +15,13 @@
 #ifndef OPEN_SPIEL_GAME_PARAMETERS_H_
 #define OPEN_SPIEL_GAME_PARAMETERS_H_
 
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 
+#include "absl/types/optional.h"
 #include "open_spiel/spiel_utils.h"
 
 namespace open_spiel {
@@ -78,7 +80,7 @@ class GameParameter {
   explicit GameParameter(bool value, bool is_mandatory = false)
       : is_mandatory_(is_mandatory), bool_value_(value), type_(Type::kBool) {}
 
-  explicit GameParameter(std::map<std::string, GameParameter> value,
+  explicit GameParameter(GameParameters value,
                          bool is_mandatory = false)
       : is_mandatory_(is_mandatory),
         game_value_(std::move(value)),
@@ -126,7 +128,7 @@ class GameParameter {
     return bool_value_;
   }
 
-  const std::map<std::string, GameParameter>& game_value() const {
+  const GameParameters& game_value() const {
     SPIEL_CHECK_TRUE(type_ == Type::kGame);
     return game_value_;
   }
@@ -137,6 +139,9 @@ class GameParameter {
   // to avoid compilation problems on some older compilers.
   template <typename T>
   T value() const;
+
+  template <typename T>
+  T value_with_default(T default_value) const;
 
   bool operator==(const GameParameter& rhs) const {
     switch (type_) {
@@ -153,6 +158,9 @@ class GameParameter {
       case Type::kUnset:
         return rhs.type_ == Type::kUnset;
     }
+    std::cerr << "Unrecognized parameter type in operator=="
+              << ", returning false." << std::endl;
+    return false;
   }
   bool operator!=(const GameParameter& rhs) const { return !(*this == rhs); }
 
@@ -170,7 +178,7 @@ class GameParameter {
   double double_value_ = 0.0;
   std::string string_value_ = "";
   bool bool_value_ = false;
-  std::map<std::string, GameParameter> game_value_ = {};
+  GameParameters game_value_ = {};
   Type type_;
 };
 
@@ -194,6 +202,22 @@ GameParameter DeserializeGameParameter(
 inline bool IsParameterSpecified(const GameParameters& table,
                                  const std::string& key) {
   return table.find(key) != table.end();
+}
+
+template <typename T>
+T ParameterValue(const GameParameters& params, const std::string& key,
+                 absl::optional<T> default_value = absl::nullopt) {
+  auto iter = params.find(key);
+  if (iter == params.end()) {
+    if (!default_value.has_value()) {
+      SpielFatalError(absl::StrCat("Cannot find parameter and no default "
+                                   "value passed for key: ", key));
+    }
+
+    return *default_value;
+  } else {
+    return iter->second.value<T>();
+  }
 }
 
 }  // namespace open_spiel

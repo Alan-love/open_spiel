@@ -1,10 +1,10 @@
-# Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+# Copyright 2019 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,11 +58,10 @@ def _run_once(state, bots):
 def main(argv):
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
-  game = pyspiel.load_game(
-      "bridge_uncontested_bidding", {
-          "relative_scoring": pyspiel.GameParameter(True),
-          "rng_seed": pyspiel.GameParameter(FLAGS.rng_seed),
-      })
+  game = pyspiel.load_game("bridge_uncontested_bidding", {
+      "relative_scoring": True,
+      "rng_seed": FLAGS.rng_seed,
+  })
   bots = [
       bluechip_bridge_uncontested_bidding.BlueChipBridgeBot(
           game, 0, _WBridge5Client(FLAGS.bot_cmd)),

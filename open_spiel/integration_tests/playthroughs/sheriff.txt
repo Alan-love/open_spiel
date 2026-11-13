@@ -8,7 +8,7 @@ GameType.max_num_players = 2
 GameType.min_num_players = 2
 GameType.parameter_specification = ["item_penalty", "item_value", "max_bribe", "max_items", "num_rounds", "sheriff_penalty"]
 GameType.provides_information_state_string = True
-GameType.provides_information_state_tensor = False
+GameType.provides_information_state_tensor = True
 GameType.provides_observation_string = False
 GameType.provides_observation_tensor = False
 GameType.provides_factored_observation_string = False
@@ -24,6 +24,9 @@ NumPlayers() = 2
 MinUtility() = -6.0
 MaxUtility() = 6.0
 UtilitySum() = None
+InformationStateTensorShape() = [33]
+InformationStateTensorLayout() = TensorLayout.CHW
+InformationStateTensorSize() = 33
 MaxGameLength() = 9
 ToString() = "sheriff()"
 
@@ -37,8 +40,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 0
 InformationStateString(0) = "T=0 num_illegal_items:none"
 InformationStateString(1) = "T=0 "
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◉◯◉◯◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◉◯◯◉◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [2, 3, 4, 5]
 StringLegalActions() = ["PlaceIllegalItems(num=0)", "PlaceIllegalItems(num=1)", "PlaceIllegalItems(num=2)", "PlaceIllegalItems(num=3)"]
 
@@ -57,8 +62,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 0
 InformationStateString(0) = "T=1 num_illegal_items:1"
 InformationStateString(1) = "T=1 "
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◉◯◉◯◯◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◉◯◯◉◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [6, 7, 8, 9]
 StringLegalActions() = ["Bribe(amount=0)", "Bribe(amount=1)", "Bribe(amount=2)", "Bribe(amount=3)"]
 
@@ -77,8 +84,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 1
 InformationStateString(0) = "T=2 num_illegal_items:1/bribe:3"
 InformationStateString(1) = "T=2 /bribe:3"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◯◉◉◯◯◯◉◯◯◯◉◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◉◯◯◉◯◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [0, 1]
 StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFeedback(will_inspect=True)"]
 
@@ -97,8 +106,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 0
 InformationStateString(0) = "T=3 num_illegal_items:1/bribe:3/feedback:1"
 InformationStateString(1) = "T=3 /bribe:3/feedback:1"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◉◯◉◯◯◯◯◉◯◯◉◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◉◯◯◉◯◯◯◉◯◯◯◯◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [6, 7, 8, 9]
 StringLegalActions() = ["Bribe(amount=0)", "Bribe(amount=1)", "Bribe(amount=2)", "Bribe(amount=3)"]
 
@@ -117,8 +128,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 1
 InformationStateString(0) = "T=4 num_illegal_items:1/bribe:3/feedback:1/bribe:3"
 InformationStateString(1) = "T=4 /bribe:3/feedback:1/bribe:3"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◯◉◉◯◯◯◯◯◉◯◉◯◯◯◯◯◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◉◯◯◯◯◉◯◯◯◯◯◯◯◉◯◯◯◯◉◯◯◯◯◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [0, 1]
 StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFeedback(will_inspect=True)"]
 
@@ -126,22 +139,6 @@ StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFee
 action: 0
 
 # State 5
-# Num illegal items in cargo: 1
-# Bribes  : [3,3]
-# Feedback: [1,0]
-IsTerminal() = False
-History() = [3, 9, 1, 9, 0]
-HistoryString() = "3, 9, 1, 9, 0"
-IsChanceNode() = False
-IsSimultaneousNode() = False
-CurrentPlayer() = 0
-InformationStateString(0) = "T=5 num_illegal_items:1/bribe:3/feedback:1/bribe:3/feedback:0"
-InformationStateString(1) = "T=5 /bribe:3/feedback:1/bribe:3/feedback:0"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
-LegalActions() = [6, 7, 8, 9]
-StringLegalActions() = ["Bribe(amount=0)", "Bribe(amount=1)", "Bribe(amount=2)", "Bribe(amount=3)"]
-
 # Apply action "Bribe(amount=2)"
 action: 8
 
@@ -157,8 +154,10 @@ IsSimultaneousNode() = False
 CurrentPlayer() = 1
 InformationStateString(0) = "T=6 num_illegal_items:1/bribe:3/feedback:1/bribe:3/feedback:0/bribe:2"
 InformationStateString(1) = "T=6 /bribe:3/feedback:1/bribe:3/feedback:0/bribe:2"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
+InformationStateTensor(0): ◯◉◉◯◯◯◯◯◯◯◉◯◯◯◯◯◉◯◯◯◯◉◉◯◯◉◯◯◯◯◯◯◯
+InformationStateTensor(1): ◯◉◯◉◯◯◯◯◯◯◉◯◯◯◯◯◉◯◯◯◯◉◉◯◯◉◯◯◯◯◯◯◯
+Rewards() = [0, 0]
+Returns() = [0, 0]
 LegalActions() = [0, 1]
 StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFeedback(will_inspect=True)"]
 
@@ -166,42 +165,10 @@ StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFee
 action: 0
 
 # State 7
-# Num illegal items in cargo: 1
-# Bribes  : [3,3,2]
-# Feedback: [1,0,0]
-IsTerminal() = False
-History() = [3, 9, 1, 9, 0, 8, 0]
-HistoryString() = "3, 9, 1, 9, 0, 8, 0"
-IsChanceNode() = False
-IsSimultaneousNode() = False
-CurrentPlayer() = 0
-InformationStateString(0) = "T=7 num_illegal_items:1/bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0"
-InformationStateString(1) = "T=7 /bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
-LegalActions() = [6, 7, 8, 9]
-StringLegalActions() = ["Bribe(amount=0)", "Bribe(amount=1)", "Bribe(amount=2)", "Bribe(amount=3)"]
-
 # Apply action "Bribe(amount=3)"
 action: 9
 
 # State 8
-# Num illegal items in cargo: 1
-# Bribes  : [3,3,2,3]
-# Feedback: [1,0,0]
-IsTerminal() = False
-History() = [3, 9, 1, 9, 0, 8, 0, 9]
-HistoryString() = "3, 9, 1, 9, 0, 8, 0, 9"
-IsChanceNode() = False
-IsSimultaneousNode() = False
-CurrentPlayer() = 1
-InformationStateString(0) = "T=8 num_illegal_items:1/bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0/bribe:3"
-InformationStateString(1) = "T=8 /bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0/bribe:3"
-Rewards() = [0.0, 0.0]
-Returns() = [0.0, 0.0]
-LegalActions() = [0, 1]
-StringLegalActions() = ["InspectionFeedback(will_inspect=False)", "InspectionFeedback(will_inspect=True)"]
-
 # Apply action "InspectionFeedback(will_inspect=True)"
 action: 1
 
@@ -217,5 +184,7 @@ IsSimultaneousNode() = False
 CurrentPlayer() = -4
 InformationStateString(0) = "T=9 num_illegal_items:1/bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0/bribe:3/feedback:1"
 InformationStateString(1) = "T=9 /bribe:3/feedback:1/bribe:3/feedback:0/bribe:2/feedback:0/bribe:3/feedback:1"
-Rewards() = [-2.0, 2.0]
-Returns() = [-2.0, 2.0]
+InformationStateTensor(0): ◯◯◉◯◯◯◯◯◯◯◉◯◯◉◯◯◉◯◯◯◯◉◉◯◯◉◯◉◯◯◯◉◯
+InformationStateTensor(1): ◯◯◯◉◯◯◯◯◯◯◯◯◯◉◯◯◉◯◯◯◯◉◉◯◯◉◯◉◯◯◯◉◯
+Rewards() = [-2, 2]
+Returns() = [-2, 2]

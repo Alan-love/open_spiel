@@ -1,10 +1,10 @@
-# Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+# Copyright 2019 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,6 @@
 # limitations under the License.
 
 """Tests for open_spiel.python.algorithms.action_value.py."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -32,8 +28,7 @@ class ActionValuesTest(parameterized.TestCase):
   @parameterized.parameters([["kuhn_poker", 2], ["kuhn_poker", 3],
                              ["leduc_poker", 2]])
   def test_runs_with_uniform_policies(self, game_name, num_players):
-    game = pyspiel.load_game(game_name, {"players": pyspiel.GameParameter(
-        num_players)})
+    game = pyspiel.load_game(game_name, {"players": num_players})
     calc = action_value.TreeWalkCalculator(game)
     uniform_policy = policy.TabularPolicy(game)
     calc.compute_all_states_action_values([uniform_policy] * num_players)

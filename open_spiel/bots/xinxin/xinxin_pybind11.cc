@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,11 +14,7 @@
 
 #include "open_spiel/bots/xinxin/xinxin_bot.h"
 #include "open_spiel/spiel_bots.h"
-#include "pybind11/include/pybind11/functional.h"
-#include "pybind11/include/pybind11/numpy.h"
-#include "pybind11/include/pybind11/operators.h"
-#include "pybind11/include/pybind11/pybind11.h"
-#include "pybind11/include/pybind11/stl.h"
+#include "open_spiel/python/pybind11/pybind11.h"
 
 namespace open_spiel {
 

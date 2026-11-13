@@ -1,10 +1,10 @@
-# Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+# Copyright 2019 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,16 +21,20 @@ game in Python.
 Python games are significantly slower than C++, but it may still be suitable
 for prototyping or for small games.
 
-It is possible to run C++ algorithms on Python implemented games, This is likely
+It is possible to run C++ algorithms on Python-implemented games. This is likely
 to have good performance if the algorithm simply extracts a game tree and then
 works with that (e.g. CFR algorithms). It is likely to be poor if the algorithm
-relies on processing and updating states as it goes, e.g. MCTS.
+relies on processing and updating states as it goes, e.g., MCTS.
 """
+
+from typing import Any
 
 import numpy as np
 
 from open_spiel.python.observation import IIGObserverForPublicInfoGame
 import pyspiel
+
+JsonDict = dict[str, Any]
 
 _NUM_PLAYERS = 2
 _NUM_ROWS = 3
@@ -65,11 +69,16 @@ class TicTacToeGame(pyspiel.Game):
   """A Python version of the Tic-Tac-Toe game."""
 
   def __init__(self, params=None):
-    super().__init__(self, _GAME_TYPE, _GAME_INFO, params or dict())
+    super().__init__(_GAME_TYPE, _GAME_INFO, params or dict())
 
-  def new_initial_state(self):
-    """Returns a state corresponding to the start of a game."""
-    return TicTacToeState(self)
+  def new_initial_state(self, state=None):
+    """Returns a state corresponding to the start of a game.
+
+    Args:
+      state: None for a fresh initial state, a dict (from to_dict), or a
+        StateStruct (from to_struct) to reconstruct a state.
+    """
+    return TicTacToeState(self, state=state)
 
   def make_py_observer(self, iig_obs_type=None, params=None):
     """Returns an object used for observing game state."""
@@ -83,13 +92,72 @@ class TicTacToeGame(pyspiel.Game):
 class TicTacToeState(pyspiel.State):
   """A python version of the Tic-Tac-Toe state."""
 
-  def __init__(self, game):
+  def __init__(
+      self,
+      game: TicTacToeGame,
+      state: pyspiel.StateStruct | JsonDict | None = None,
+  ) -> None:
     """Constructor; should only be called by Game.new_initial_state."""
-    super().__init__(self, game)
+    super().__init__(game)
     self._cur_player = 0
     self._player0_score = 0.0
     self._is_terminal = False
     self.board = np.full((_NUM_ROWS, _NUM_COLS), ".")
+
+    if state is None:
+      return
+
+    if isinstance(state, pyspiel.StateStruct):
+      state = state.to_dict()
+    board = state["board"]
+    if len(board) != _NUM_CELLS:
+      raise ValueError(
+          f"Invalid board size: expected {_NUM_CELLS}, got {len(board)}"
+      )
+    char_map = {".": ".", "x": "x", "o": "o", "empty": "."}
+    for i, cell in enumerate(board):
+      self.board[_coord(i)] = char_map.get(cell, cell)
+    num_x = sum(1 for c in self.board.ravel() if c == "x")
+    num_o = sum(1 for c in self.board.ravel() if c == "o")
+    if num_x < num_o or num_x > num_o + 1:
+      raise ValueError(f"Invalid board: x={num_x}, o={num_o}")
+    self._cur_player = 0 if num_x == num_o else 1
+
+    x_wins = _has_line(self.board, "x")
+    o_wins = _has_line(self.board, "o")
+
+    if x_wins and o_wins:
+      raise ValueError("Invalid board state: both players have a line.")
+
+    if x_wins:
+      if num_x != num_o + 1:
+        raise ValueError(
+            "Invalid board state: x has a line, but number of pieces is "
+            f"inconsistent, got x={num_x}, o={num_o}"
+        )
+      self._is_terminal = True
+      self._player0_score = 1.0
+    elif o_wins:
+      if num_x != num_o:
+        raise ValueError(
+            "Invalid board state: o has a line, but number of pieces is "
+            f"inconsistent, got x={num_x}, o={num_o}"
+        )
+      self._is_terminal = True
+      self._player0_score = -1.0
+    elif all(self.board.ravel() != "."):
+      self._is_terminal = True
+
+    if "current_player" in state:
+      if self._is_terminal:
+        expected_player_str = "Terminal"
+      else:
+        expected_player_str = "x" if self._cur_player == 0 else "o"
+      if state["current_player"] != expected_player_str:
+        raise ValueError(
+            f"Invalid current player: expected {expected_player_str}, "
+            f"got {state['current_player']}"
+        )
 
   # OpenSpiel (PySpiel) API functions are below. This is the standard set that
   # should be implemented by every perfect-information sequential-move game.
@@ -98,14 +166,11 @@ class TicTacToeState(pyspiel.State):
     """Returns id of the next player to move, or TERMINAL if game is over."""
     return pyspiel.PlayerId.TERMINAL if self._is_terminal else self._cur_player
 
-  def legal_actions(self, player=None):
+  def _legal_actions(self, player):
     """Returns a list of legal actions, sorted in ascending order."""
-    if self._is_terminal or (player is not None and player != self._cur_player):
-      return []
-    else:
-      return [a for a in range(_NUM_CELLS) if self.board[_coord(a)] == "."]
+    return [a for a in range(_NUM_CELLS) if self.board[_coord(a)] == "."]
 
-  def do_apply_action(self, action):
+  def _apply_action(self, action):
     """Applies the specified action to the state."""
     self.board[_coord(action)] = "x" if self._cur_player == 0 else "o"
     if _line_exists(self.board):
@@ -133,13 +198,37 @@ class TicTacToeState(pyspiel.State):
     """String for debug purposes. No particular semantics are required."""
     return _board_to_string(self.board)
 
-  def __setstate__(self, data):
-    """Support for unpickling."""
-    # TODO(author11) It should be possible to do this in the C++ layer instead
-    game, state = pyspiel.deserialize_game_and_state(data)
-    self.__init__(game)
-    for h in state.full_history():
-      self.apply_action(h.action)
+  # SpielStruct API methods (optional). These return plain Python dicts that
+  # the C++ trampoline wraps as DictStateStruct / DictActionStruct /
+  # DictObservationStruct objects, enabling JSON serialization and the
+  # full struct-based action API (validate_action_struct, apply_action_struct).
+
+  def _to_struct(self):
+    """Returns a dict representation of the state."""
+    cell_names = {".": ".", "x": "x", "o": "o"}
+    if self.is_terminal():
+      current_player_str = "Terminal"
+    else:
+      current_player_str = "x" if self._cur_player == 0 else "o"
+    return {
+        "current_player": current_player_str,
+        "board": [cell_names[self.board[_coord(i)]] for i in range(_NUM_CELLS)],
+    }
+
+  def _action_to_struct(self, player, action):
+    """Converts an action integer to a dict with row/col fields."""
+    del player  # Unused.
+    row, col = _coord(action)
+    return {"row": row, "col": col}
+
+  def _struct_to_actions(self, action_dict):
+    """Converts an action dict back to a list of integer actions."""
+    return [action_dict["row"] * _NUM_COLS + action_dict["col"]]
+
+  def _to_observation_struct(self, player):
+    """Returns a dict observation from the perspective of `player`."""
+    del player  # Unused.
+    return self._to_struct()
 
 
 class BoardObserver:
@@ -151,9 +240,10 @@ class BoardObserver:
       raise ValueError(f"Observation parameters not supported; passed {params}")
     # The observation should contain a 1-D tensor in `self.tensor` and a
     # dictionary of views onto the tensor, which may be of any shape.
-    # Here the observation is indexed `(row, column, cell type)`.
-    self.tensor = np.zeros(3 * 3 * 3, np.float32)
-    self.dict = {"observation": np.reshape(self.tensor, (3, 3, 3))}
+    # Here the observation is indexed `(cell state, row, column)`.
+    shape = (1 + _NUM_PLAYERS, _NUM_ROWS, _NUM_COLS)
+    self.tensor = np.zeros(np.prod(shape), np.float32)
+    self.dict = {"observation": np.reshape(self.tensor, shape)}
 
   def set_from(self, state, player):
     """Updates `tensor` and `dict` to reflect `state` from PoV of `player`."""
@@ -161,11 +251,11 @@ class BoardObserver:
     # We update the observation via the shaped tensor since indexing is more
     # convenient than with the 1-D tensor. Both are views onto the same memory.
     obs = self.dict["observation"]
-    obs[:] = 0
+    obs.fill(0)
     for row in range(_NUM_ROWS):
       for col in range(_NUM_COLS):
-        index = ".ox".index(state.board[row, col])
-        obs[index, row, col] = 1.0
+        cell_state = ".ox".index(state.board[row, col])
+        obs[cell_state, row, col] = 1
 
   def string_from(self, state, player):
     """Observation of `state` from the PoV of `player`, as a string."""
@@ -176,19 +266,27 @@ class BoardObserver:
 # Helper functions for game details.
 
 
-def _line_value(line):
-  """Checks a possible line, returning the winning symbol if any."""
-  if all(line == "x") or all(line == "o"):
-    return line[0]
+def _has_line(board, player):
+  """Checks if the player has a line."""
+  return (
+      all(board[0] == player)
+      or all(board[1] == player)
+      or all(board[2] == player)
+      or all(board[:, 0] == player)
+      or all(board[:, 1] == player)
+      or all(board[:, 2] == player)
+      or all(board.diagonal() == player)
+      or all(np.fliplr(board).diagonal() == player)
+  )
 
 
 def _line_exists(board):
   """Checks if a line exists, returns "x" or "o" if so, and None otherwise."""
-  return (_line_value(board[0]) or _line_value(board[1]) or
-          _line_value(board[2]) or _line_value(board[:, 0]) or
-          _line_value(board[:, 1]) or _line_value(board[:, 2]) or
-          _line_value(board.diagonal()) or
-          _line_value(np.fliplr(board).diagonal()))
+  if _has_line(board, "x"):
+    return "x"
+  if _has_line(board, "o"):
+    return "o"
+  return None
 
 
 def _coord(move):

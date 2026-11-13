@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,8 +14,12 @@
 
 #include "open_spiel/algorithms/evaluate_bots.h"
 
+#include <limits>
+#include <random>
 #include <vector>
 
+#include "absl/time/time.h"
+#include "absl/random/distributions.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_bots.h"
 
@@ -59,6 +63,21 @@ std::vector<double> EvaluateBots(State* state, const std::vector<Bot*>& bots,
 
   // Return terminal utility.
   return state->Returns();
+}
+
+std::vector<double> EvaluateBots(const Game& game,
+                                 const std::vector<Bot*>& bots, int seed) {
+  std::unique_ptr<State> state = game.NewInitialState();
+  return EvaluateBots(state.get(), bots, seed);
+}
+
+std::vector<double> EvaluateBots(const Game& game,
+                                 const std::vector<Bot*>& bots) {
+  absl::Duration time_gap = absl::Now() - absl::UnixEpoch();
+  std::mt19937 rng(absl::ToInt64Nanoseconds(time_gap));
+  const int seed = absl::Uniform<int>(rng, std::numeric_limits<int>::min(),
+                                      std::numeric_limits<int>::max());
+  return EvaluateBots(game, bots, seed);
 }
 
 }  // namespace open_spiel

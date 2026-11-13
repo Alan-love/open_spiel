@@ -1,10 +1,10 @@
-# Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+# Copyright 2019 DeepMind Technologies Limited
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Lint as: python3
 """Tests for open_spiel.python.algorithms.psro_v2.best_response_oracle."""
 
 from absl.testing import absltest
@@ -30,8 +29,7 @@ class BestResponseOracleTest(parameterized.TestCase, absltest.TestCase):
                             ("leduc_poker", 2))
   def test_cpp_python_best_response_oracle(self, game_name, num_players):
     # Tests that these best responses interface well with Best Response Oracle
-    game = pyspiel.load_game(game_name,
-                             {"players": pyspiel.GameParameter(num_players)})
+    game = pyspiel.load_game(game_name, {"players": num_players})
     all_states, _ = best_response.compute_states_and_info_states_if_none(
         game, all_states=None, state_to_information_state=None)
 

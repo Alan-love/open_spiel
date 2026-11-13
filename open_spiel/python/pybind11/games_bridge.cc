@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,9 @@
 
 #include <memory>
 
-#include "open_spiel/games/bridge.h"
+#include "open_spiel/games/bridge/bridge.h"
+#include "open_spiel/python/pybind11/pybind11.h"
 #include "open_spiel/spiel.h"
-#include "pybind11/include/pybind11/numpy.h"
-#include "pybind11/include/pybind11/pybind11.h"
-#include "pybind11/include/pybind11/stl.h"
 
 namespace open_spiel {
 
@@ -29,7 +27,7 @@ using bridge::BridgeGame;
 using bridge::BridgeState;
 
 void init_pyspiel_games_bridge(py::module& m) {
-  py::class_<BridgeState, State>(m, "BridgeState")
+  py::classh<BridgeState, State>(m, "BridgeState")
       .def("contract_index", &BridgeState::ContractIndex)
       .def("possible_contracts", &BridgeState::PossibleContracts)
       .def("score_by_contract", &BridgeState::ScoreByContract)
@@ -59,7 +57,10 @@ void init_pyspiel_games_bridge(py::module& m) {
             return dynamic_cast<BridgeState*>(game_and_state.second.release());
           }));
 
-  py::class_<BridgeGame, std::shared_ptr<BridgeGame>, Game>(m, "BridgeGame")
+  py::classh<BridgeGame, Game>(m, "BridgeGame")
+      .def("new_initial_state", &BridgeGame::NewInitialState)
+      .def("new_initial_state", &BridgeGame::NewDuplicateBridgeInitialState,
+           py::arg("tournament_seed"), py::arg("board_number"))
       .def("num_possible_contracts", &BridgeGame::NumPossibleContracts)
       .def("contract_string", &BridgeGame::ContractString)
       .def("private_observation_tensor_size",

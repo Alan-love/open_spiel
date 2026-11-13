@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2021 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,9 @@
 #include <random>
 #include <vector>
 
-#include "open_spiel/abseil-cpp/absl/flags/flag.h"
-#include "open_spiel/abseil-cpp/absl/flags/parse.h"
-#include "open_spiel/abseil-cpp/absl/strings/str_format.h"
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl/strings/str_format.h"
 #include "open_spiel/spiel.h"
 
 ABSL_FLAG(std::string, game, "tic_tac_toe", "The name of the game to play.");
@@ -81,8 +81,11 @@ int RandomSimulation(std::mt19937* rng, const Game& game, bool verbose) {
       for (int p = 0; p < game.NumPlayers(); p++) {
         std::vector<Action> actions;
         actions = state->LegalActions(p);
-        std::uniform_int_distribution<int> dis(0, actions.size() - 1);
-        Action action = actions[dis(*rng)];
+        Action action = 0;
+        if (!actions.empty()) {
+          std::uniform_int_distribution<int> dis(0, actions.size() - 1);
+          action = actions[dis(*rng)];
+        }
         joint_action.push_back(action);
         if (verbose) {
           std::cout << "Player " << p

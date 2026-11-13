@@ -1,10 +1,10 @@
-// Copyright 2019 DeepMind Technologies Ltd. All rights reserved.
+// Copyright 2019 DeepMind Technologies Limited
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,7 @@
 #include <ostream>
 #include <sstream>
 
-#include "open_spiel/abseil-cpp/absl/algorithm/container.h"
+#include "absl/algorithm/container.h"
 #include "open_spiel/games/universal_poker/acpc/project_acpc_server/game.h"
 #include "open_spiel/spiel_utils.h"
 
@@ -168,6 +168,13 @@ uint32_t ACPCGame::BlindSize(uint8_t player) const {
   SPIEL_CHECK_LT(player, GetNbPlayers());
   return acpc_game_.blind[player];
 }
+uint32_t ACPCGame::TotalMoney() const {
+  int money_pool = 0;
+  for (int pl = 0; pl < acpc_game_.numPlayers; ++pl) {
+    money_pool += acpc_game_.stack[pl];
+  }
+  return money_pool;
+}
 
 std::string ACPCState::ToString() const {
   char buf[kStringBuffersize];
@@ -229,11 +236,6 @@ int ACPCState::IsValidAction(const ACPCState::ACPCActionType actionType,
 uint32_t ACPCState::Money(const uint8_t player) const {
   SPIEL_CHECK_LE(player, game_->GetNbPlayers());
   return game_->StackSize(player) - acpcState_.spent[player];
-}
-
-uint32_t ACPCState::Ante(const uint8_t player) const {
-  SPIEL_CHECK_LE(player, game_->GetNbPlayers());
-  return acpcState_.spent[player];
 }
 
 uint32_t ACPCState::TotalSpent() const {
